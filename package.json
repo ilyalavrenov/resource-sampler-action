@@ -1,0 +1,23 @@
+{
+  "name": "resource-sampler-action",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sample a CI runner's CPU/memory/I/O/disk/network for a job and render charts + a step waterfall to the summary",
+  "license": "MIT",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src",
+    "format": "oxfmt --write src",
+    "format:check": "oxfmt --check src",
+    "test": "tsc && node --test dist/*.test.js"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "oxfmt": "0.58.0",
+    "oxlint": "1.73.0",
+    "typescript": "7.0.2"
+  },
+  "packageManager": "pnpm@11.11.0"
+}

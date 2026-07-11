@@ -1,0 +1,47 @@
+name: Resource sampler
+description: >-
+  Samples CPU, memory, I/O wait, disk throughput, and network throughput in the
+  background for the lifetime of the job and renders timeseries charts plus a
+  step-timeline waterfall to the job summary. Optionally also pushes the samples
+  to an OTLP-compatible HTTP endpoint for cross-run trends. Self-contained Node
+  action (no third-party dependency); add it as the first step of a job and its
+  post step publishes automatically at job end. The waterfall reads this job's
+  step timings from the Actions API, so the job needs `actions: read` permission
+  (the charts work without it).
+
+branding:
+  icon: activity
+  color: blue
+
+inputs:
+  interval:
+    description: Seconds between samples.
+    required: false
+    default: "5"
+  max-points:
+    description: Max points to plot on the line (samples are downsampled to fit).
+    required: false
+    default: "120"
+  github-token:
+    description: Token used to read this job's step timings for the waterfall.
+    required: false
+    default: ${{ github.token }}
+  otlp-endpoint:
+    description: >-
+      Base URL of any OTLP-compatible HTTP endpoint/collector to push samples to.
+      The action appends /v1/metrics. Leave unset to disable the push and only
+      render the summary.
+    required: false
+    default: ""
+  otlp-auth:
+    description: >-
+      Full Authorization header value for the OTLP endpoint (e.g.
+      "Basic <base64(...)>"). When empty, the push is skipped: the normal case
+      on forks/PRs where the secret isn't exposed.
+    required: false
+    default: ""
+
+runs:
+  using: node24
+  main: dist/index.js
+  post: dist/index.js
