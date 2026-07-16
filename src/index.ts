@@ -324,17 +324,22 @@ async function postOtlp(
   }
 }
 
-async function pushOtlp(rows: CsvRow[], originMs: number): Promise<void> {
+function otlpTarget(): { endpoint: string; auth: string } | null {
   const endpoint = process.env.STATE_otlpEndpoint;
   const auth = process.env.STATE_otlpAuth;
-  if (!endpoint || !auth) return;
+  return endpoint && auth ? { endpoint, auth } : null;
+}
+
+async function pushOtlp(rows: CsvRow[], originMs: number): Promise<void> {
+  const target = otlpTarget();
+  if (!target) return;
   if (!Number.isFinite(originMs)) {
     console.log("[resource-sampler] otlp push skipped: no sampler origin timestamp");
     return;
   }
   const payload = buildOtlpPayload(rows, originMs, process.env);
   const points = rows.length * OTLP_METRICS.length;
-  const status = await postOtlp(endpoint, auth, "metrics", payload);
+  const status = await postOtlp(target.endpoint, target.auth, "metrics", payload);
   if (status && status >= 200 && status < 300) {
     console.log(`[resource-sampler] pushed ${points} OTLP data points (HTTP ${status})`);
   } else {
@@ -432,9 +437,8 @@ function buildTracePayload(
 }
 
 async function pushTraces(job: GhJob | null, steps: GhStep[] | null | undefined): Promise<void> {
-  const endpoint = process.env.STATE_otlpEndpoint;
-  const auth = process.env.STATE_otlpAuth;
-  if (!endpoint || !auth) return;
+  const target = otlpTarget();
+  if (!target) return;
   if (!job || !job.started_at || !Array.isArray(steps)) return;
   const payload = buildTracePayload(job, steps, process.env);
   if (!payload) {
@@ -442,7 +446,7 @@ async function pushTraces(job: GhJob | null, steps: GhStep[] | null | undefined)
     return;
   }
   const nSpans = payload.resourceSpans[0].scopeSpans[0].spans.length;
-  const status = await postOtlp(endpoint, auth, "traces", payload);
+  const status = await postOtlp(target.endpoint, target.auth, "traces", payload);
   if (status && status >= 200 && status < 300) {
     console.log(`[resource-sampler] pushed trace with ${nSpans} spans (HTTP ${status})`);
   } else {
@@ -497,16 +501,15 @@ async function pushJobDuration(
   job: GhJob | null,
   steps: GhStep[] | null | undefined,
 ): Promise<void> {
-  const endpoint = process.env.STATE_otlpEndpoint;
-  const auth = process.env.STATE_otlpAuth;
-  if (!endpoint || !auth) return;
+  const target = otlpTarget();
+  if (!target) return;
   if (!job || !job.started_at) return;
   const payload = buildJobDurationPayload(job, steps, process.env);
   if (!payload) {
     console.log("[resource-sampler] otlp job duration push skipped: unparseable job start time");
     return;
   }
-  const status = await postOtlp(endpoint, auth, "metrics", payload);
+  const status = await postOtlp(target.endpoint, target.auth, "metrics", payload);
   if (status && status >= 200 && status < 300) {
     console.log(`[resource-sampler] pushed job duration metric (HTTP ${status})`);
   } else {
@@ -768,11 +771,8 @@ async function publish(): Promise<void> {
   const netMax = Math.round(peak.net * 1.1) + 1;
 
   let waterfall = "";
-  let job: GhJob | null = null;
-  const steps = await fetchJob().then((j) => {
-    job = j;
-    return j?.steps || null;
-  });
+  const job = await fetchJob();
+  const steps = job?.steps || null;
   if (steps) waterfall = buildWaterfall(steps);
   const originMs = fs.existsSync(START_PATH) ? Number(fs.readFileSync(START_PATH, "utf8")) : NaN;
 
