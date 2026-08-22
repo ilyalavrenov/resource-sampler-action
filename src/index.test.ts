@@ -268,10 +268,10 @@ test("postOtlp POSTs JSON to /v1/metrics with auth header", async () => {
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   const { port } = server.address() as import("node:net").AddressInfo;
 
-  let status;
+  let result;
   try {
     const payload = buildOtlpPayload(ROWS, ORIGIN_MS, ENV);
-    status = await postOtlp(
+    result = await postOtlp(
       `http://127.0.0.1:${port}`,
       "Basic dGVzdDp0b2tlbg==",
       "metrics",
@@ -281,7 +281,8 @@ test("postOtlp POSTs JSON to /v1/metrics with auth header", async () => {
     server.close();
   }
 
-  assert.equal(status, 200);
+  assert.equal(result!.status, 200);
+  assert.ok(result!.ms >= 0 && Number.isFinite(result!.ms));
   assert.equal(captured.method, "POST");
   assert.equal(captured.path, "/v1/metrics");
   assert.equal(captured.auth, "Basic dGVzdDp0b2tlbg==");
@@ -290,7 +291,7 @@ test("postOtlp POSTs JSON to /v1/metrics with auth header", async () => {
 });
 
 test("postOtlp resolves null on a bad endpoint, never throws", async () => {
-  const status = await postOtlp("not a url", "Basic x", "metrics", { resourceMetrics: [] });
+  const { status } = await postOtlp("not a url", "Basic x", "metrics", { resourceMetrics: [] });
   assert.equal(status, null);
 });
 
