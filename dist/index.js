@@ -216,8 +216,9 @@ async function postOtlp(endpoint, auth, signal, body) {
         url.pathname = base + `/v1/${signal}`;
     }
     catch {
-        return null;
+        return { status: null, ms: 0 };
     }
+    const t0 = Date.now();
     try {
         const res = await fetch(url, {
             method: "POST",
@@ -229,10 +230,10 @@ async function postOtlp(endpoint, auth, signal, body) {
                 "user-agent": "resource-sampler",
             },
         });
-        return res.status;
+        return { status: res.status, ms: Date.now() - t0 };
     }
     catch {
-        return null;
+        return { status: null, ms: Date.now() - t0 };
     }
 }
 function otlpTarget() {
@@ -250,12 +251,12 @@ async function pushOtlp(rows, originMs) {
     }
     const payload = buildOtlpPayload(rows, originMs, process.env);
     const points = rows.length * OTLP_METRICS.length;
-    const status = await postOtlp(target.endpoint, target.auth, "metrics", payload);
+    const { status, ms } = await postOtlp(target.endpoint, target.auth, "metrics", payload);
     if (status && status >= 200 && status < 300) {
-        console.log(`[resource-sampler] pushed ${points} OTLP data points (HTTP ${status})`);
+        console.log(`[resource-sampler] pushed ${points} OTLP data points (HTTP ${status}, ${ms}ms)`);
     }
     else {
-        console.log(`[resource-sampler] otlp metrics push failed (status ${status}) — charts unaffected`);
+        console.log(`[resource-sampler] otlp metrics push failed (status ${status}, ${ms}ms) — charts unaffected`);
     }
 }
 function genId(bytes) {
@@ -339,12 +340,12 @@ async function pushTraces(job, steps) {
         return;
     }
     const nSpans = payload.resourceSpans[0].scopeSpans[0].spans.length;
-    const status = await postOtlp(target.endpoint, target.auth, "traces", payload);
+    const { status, ms } = await postOtlp(target.endpoint, target.auth, "traces", payload);
     if (status && status >= 200 && status < 300) {
-        console.log(`[resource-sampler] pushed trace with ${nSpans} spans (HTTP ${status})`);
+        console.log(`[resource-sampler] pushed trace with ${nSpans} spans (HTTP ${status}, ${ms}ms)`);
     }
     else {
-        console.log(`[resource-sampler] otlp traces push failed (status ${status}) — summary unaffected`);
+        console.log(`[resource-sampler] otlp traces push failed (status ${status}, ${ms}ms) — summary unaffected`);
     }
 }
 const JOB_DURATION_METRIC = "ci.runner.job.duration";
@@ -395,12 +396,12 @@ async function pushJobDuration(job, steps) {
         console.log("[resource-sampler] otlp job duration push skipped: unparseable job start time");
         return;
     }
-    const status = await postOtlp(target.endpoint, target.auth, "metrics", payload);
+    const { status, ms } = await postOtlp(target.endpoint, target.auth, "metrics", payload);
     if (status && status >= 200 && status < 300) {
-        console.log(`[resource-sampler] pushed job duration metric (HTTP ${status})`);
+        console.log(`[resource-sampler] pushed job duration metric (HTTP ${status}, ${ms}ms)`);
     }
     else {
-        console.log(`[resource-sampler] otlp job duration push failed (status ${status}) — charts unaffected`);
+        console.log(`[resource-sampler] otlp job duration push failed (status ${status}, ${ms}ms) — charts unaffected`);
     }
 }
 function runSampleLoop() {
@@ -640,11 +641,11 @@ async function publish() {
         ]),
         waterfall,
     ].join("\n"));
-    await pushOtlp(rows, originMs);
-    if (job && steps)
-        await pushTraces(job, steps);
-    if (job)
-        await pushJobDuration(job, steps);
+    await Promise.all([
+        pushOtlp(rows, originMs),
+        pushTraces(job, steps),
+        pushJobDuration(job, steps),
+    ]);
 }
 if (require.main === module) {
     if (process.env.RS_MODE === "sample") {
