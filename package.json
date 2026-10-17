@@ -14,7 +14,7 @@
     "test": "tsc && node --test dist/*.test.js"
   },
   "devDependencies": {
-    "@types/node": "24.19.1",
+    "@types/node": "24.19.2",
     "oxfmt": "0.71.0",
     "oxlint": "1.88.0",
     "typescript": "7.0.2"
