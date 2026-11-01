@@ -10,6 +10,15 @@
   "labels": [
     "renovate"
   ],
+  "packageRules": [
+    {
+      "matchDepNames": [
+        "node",
+        "@types/node"
+      ],
+      "allowedVersions": "24.x"
+    }
+  ],
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "schedule": [
